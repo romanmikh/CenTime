@@ -189,31 +189,15 @@ def initialize(init_args):
 
     # Create the output directory
     init_args.exp_name = init_args.exp_name + "_" if init_args.exp_name != "" else ""
-    output_dir = os.path.join(
-        init_args.output_dir,
-        init_args.exp_name
-        + init_args.model_name
-        + "_"
-        + ("seg" if init_args.segment else "noseg")
-        + "_"
-        + ("fold" + str(init_args.fold))
-        + "_"
-        + str(init_args.lr)
-        + "_"
-        + ("CLINICAL_" if init_args.clinical_data else "")
-        + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
-    )
+    output_dir = os.path.join( init_args.output_dir, init_args.exp_name + init_args.model_name + "_" + ("seg" if init_args.segment else "noseg") + "_" + ("fold" + str(init_args.fold)) + "_" + str(init_args.lr) + "_" + ("CLINICAL_" if init_args.clinical_data else "") + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),   )
     os.makedirs(output_dir, exist_ok=True)
     print(f"Output directory: {output_dir}")
 
-    # Handle clinical data options. If clinical data is used,
-    # find the imaging model checkpoint path.
+    # Handle clinical data options. If clinical data is used, find the imaging model checkpoint path.
     if init_args.clinical_data:
         init_args.n_clinical_data = 20 if init_args.missing_data_indicator else 10
-        exps = glob(init_args.output_dir + "/*")
-        imaging_model_path = [
-            e
-            for e in exps
+        exps = glob(init_args.output_dir + "/*")  # get all experiment directories. glob ~ grep
+        imaging_model_path = [ e for e in exps
             if os.path.split(e)[1].startswith(
                 os.path.split(output_dir)[1][
                     : os.path.split(output_dir)[1].find("fold") + 5
@@ -226,18 +210,16 @@ def initialize(init_args):
             raise ValueError(
                 f"Expected exactly one imaging model path, found: {len(imaging_model_path)}"
             )
-        init_args.checkpoint_path = os.path.join(
-            imaging_model_path[0], "checkpoint_best.pth"
-        )
+        init_args.checkpoint_path = os.path.join(imaging_model_path[0], "checkpoint_best.pth")
     else:
         init_args.n_clinical_data = 0
 
-    # Initialize TensorBoard writer
-    writer = SummaryWriter(output_dir)
+    # Initialize TensorBoard writer (visualisation)
+    writer = SummaryWriter(output_dir)  
 
     # Save and print arguments
     with open(os.path.join(output_dir, "args.json"), "w") as file:
-        json.dump(vars(init_args), file, indent=4)
+        json.dump(vars(init_args), file, indent=4)  # vars: built-in func, returns dict of attributes of Namespace input args
     print(f"Arguments: {vars(init_args)}")
 
     return output_dir, writer
@@ -280,85 +262,41 @@ def parse_args() -> Namespace:
     Get arguments from command line.
 
     Returns:
-        parser: parser object
+        parser: ArgumentParser object
     """
     parser = ArgumentParser()
     data_args = parser.add_argument_group("Data Options")
     data_args.add_argument("-data_path", type=str, help="path to the dataset folder")
     data_args.add_argument("-segment", type=int, default=0, help="segmentation or not")
     data_args.add_argument("-fold", type=int, default=0, help="fold number")
-    data_args.add_argument(
-        "-n", type=int, default=-1, help="number of samples to use. -1 for all"
-    )
-    data_args.add_argument(
-        "-p_aug", default=0.0, type=float, help="probability of augmentation"
-    )
-    data_args.add_argument(
-        "-hist_match", default=0, type=int, help="histogram matching"
-    )
-    data_args.add_argument(
-        "-max_res", default=3, type=int, help="maximum slice thickness"
-    )
-    data_args.add_argument(
-        "-p_uncens",
-        default=1.0,
-        type=float,
-        help="propotion of uncensored samples to use, default 1.0 (all)",
-    )
-    data_args.add_argument(
-        "-clinical_data", default=0, type=int, help="use clinical data or not"
-    )
-    data_args.add_argument(
-        "-missing_data_indicator",
-        default=0,
-        type=int,
-        help="use missing data indicator or not",
-    )
+    data_args.add_argument("-n", type=int, default=-1, help="number of samples to use. -1 for all")
+    data_args.add_argument("-p_aug", default=0.0, type=float, help="probability of augmentation")
+    data_args.add_argument("-hist_match", default=0, type=int, help="histogram matching")
+    data_args.add_argument("-max_res", default=3, type=int, help="maximum slice thickness")
+    data_args.add_argument("-p_uncens",default=1.0,type=float,help="propotion of uncensored samples to use, default 1.0 (all)",)
+    data_args.add_argument("-clinical_data", default=0, type=int, help="use clinical data or not")
+    data_args.add_argument("-missing_data_indicator",default=0,type=int,help="use missing data indicator or not",)
 
     training_args = parser.add_argument_group("Training Options")
     training_args.add_argument("-batch_size", type=int, default=16, help="batch size")
     training_args.add_argument("-lr", type=float, default=1e-3, help="learning rate")
     training_args.add_argument("-tmax", type=int, default=156, help="tmax")
     training_args.add_argument("-epochs", type=int, default=100, help="epochs")
-    training_args.add_argument(
-        "-patience",
-        type=int,
-        default=50,
-        help="Epochs to wait before halting training when validation performance has not improved",
-    )
-    training_args.add_argument(
-        "-min_epochs", type=int, default=200, help="minimum number of epochs"
-    )
+    training_args.add_argument("-patience",type=int,default=50,help="Epochs to wait before halting training when validation performance has not improved",)
+    training_args.add_argument("-min_epochs", type=int, default=200, help="minimum number of epochs")
     training_args.add_argument("-wd", default=5e-4, type=float, help="weight decay")
 
     model_args = parser.add_argument_group("Model Options")
-    model_args.add_argument(
-        "-n_base_filters", type=int, default=16, help="number of base filters"
-    )
-    model_args.add_argument(
-        "-act", default="relu", type=str, help="activation function"
-    )
-    model_args.add_argument(
-        "-n_layers", default=3, type=int, help="number of residual blocks"
-    )
-    model_args.add_argument(
-        "-in_filters", default=1, type=int, help="number of input filters"
-    )
-    model_args.add_argument(
-        "-out_filters",
-        default=128,
-        type=int,
-        help="number of output filters before the fully-connected",
-    )
+    model_args.add_argument("-n_base_filters", type=int, default=16, help="number of base filters")
+    model_args.add_argument("-act", default="relu", type=str, help="activation function")
+    model_args.add_argument("-n_layers", default=3, type=int, help="number of residual blocks")
+    model_args.add_argument("-in_filters", default=1, type=int, help="number of input filters")
+    model_args.add_argument("-out_filters",default=128,type=int,help="number of output filters before the fully-connected",)
 
     misc_args = parser.add_argument_group("Miscellaneous Options")
-    misc_args.add_argument(
-        "-output_dir", type=str, default="exps", help="output directory"
-    )
+    misc_args.add_argument("-output_dir", type=str, default="exps", help="output directory")
     misc_args.add_argument("-exp_name", type=str, default="")
-    misc_args.add_argument(
-        "-checkpoint_path", type=str, default="", help="checkpoint to load"
-    )
+    misc_args.add_argument("-checkpoint_path", type=str, default="", help="checkpoint to load")
 
     return parser
 
@@ -410,47 +348,18 @@ def get_data(args, test=False, val=True):
     """
     if not test:
         train_dataset = create_dataset(args, "train")
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=args.batch_size,
-            shuffle=True,
-            num_workers=8,
-            pin_memory=True,
-            drop_last=True,
-        )
+        train_loader = DataLoader(train_dataset,batch_size=args.batch_size,shuffle=True,num_workers=8,pin_memory=True,drop_last=True,)
 
         if val:
-            val_dataset = create_dataset(
-                args,
-                "val",
-                clinical_normalizer=train_dataset.clinical_normalizer,
-                clinical_encoder=train_dataset.clinical_encoder,
-            )
-            val_loader = DataLoader(
-                val_dataset,
-                batch_size=args.batch_size,
-                shuffle=False,
-                num_workers=8,
-                pin_memory=True,
-            )
+            val_dataset = create_dataset(args,"val",clinical_normalizer=train_dataset.clinical_normalizer,clinical_encoder=train_dataset.clinical_encoder,)
+            val_loader = DataLoader(val_dataset,batch_size=args.batch_size,shuffle=False,num_workers=8,pin_memory=True,)
             return train_loader, val_loader
 
         return train_loader
 
     train_dataset_for_test = create_dataset(args, "train", load_imgs=False)
-    test_dataset = create_dataset(
-        args,
-        "test",
-        clinical_normalizer=train_dataset_for_test.clinical_normalizer,
-        clinical_encoder=train_dataset_for_test.clinical_encoder,
-    )
-    test_loader = DataLoader(
-        test_dataset,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=8,
-        pin_memory=True,
-    )
+    test_dataset = create_dataset(args,"test",clinical_normalizer=train_dataset_for_test.clinical_normalizer,clinical_encoder=train_dataset_for_test.clinical_encoder,)
+    test_loader = DataLoader(test_dataset,batch_size=args.batch_size,shuffle=False,num_workers=8,pin_memory=True,)
     return test_loader
 
 
@@ -483,9 +392,7 @@ def get_scheduler(args, optim):
     Returns:
         scheduler: LR scheduler.
     """
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optim, args.epochs, verbose=True
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, args.epochs, verbose=True)
     return scheduler
 
 
@@ -723,8 +630,8 @@ def get_model(args, num_output_classes, checkpoint=None):
         model: The initialized (and possibly pre-trained) PyTorch model.
     """
     # Initialize filter sizes
-    num_filters = [args.n_base_filters * (2**i) for i in range(args.n_layers)]
-    output_filters = vars(args).get("output_filters", 128)
+    num_filters = [args.n_base_filters * (2**i) for i in range(args.n_layers)]  # [0, 2, 4, ...]
+    output_filters = vars(args).get("output_filters", 128)  # 128 default if "output_filters" not set. 2**7
 
     # Initialize the model
     model = Model(

@@ -43,17 +43,10 @@ def parse_args_dist() -> Namespace:
     Returns:
         args: Namespace object containing arguments.
     """
-    parser = parse_args()
-    parser.add_argument(
-        "-loss",
-        type=str,
-        default="centime",
-        help="Loss function to use. Options: centime, classical",
-    )
-    parser.add_argument(
-        "-var", type=float, default=144, help="Fixed variance of the distribution"
-    )
-    args = parser.parse_args()
+    parser = parse_args()  # create ArgumentParser obj
+    parser.add_argument("-loss",type=str,default="centime",help="Loss function to use. Options: centime, classical",)
+    parser.add_argument("-var", type=float, default=144, help="Fixed variance of the distribution")
+    args = parser.parse_args()  # create Namespace obj
     return args
 
 
@@ -221,7 +214,7 @@ def load_checkpoint(ckpt_path: str, device: Any):
     ckpt = None
     epoch = 0
     best_epoch = 0
-    best_mae_nc = float("inf")
+    best_mae_nc = float("inf")  # mae = mean absolute error, nc = uncensored (no death yet)?
 
     # Try to load the checkpoint if provided
     if ckpt_path:
@@ -472,9 +465,7 @@ def main(main_args):
     print(f"Device: {main_args.device}")
 
     # load checkpoint, if provided
-    ckpt, epoch, best_epoch, best_mae_nc = load_checkpoint(
-        main_args.ckpt, main_args.device
-    )
+    ckpt, epoch, best_epoch, best_mae_nc = load_checkpoint(main_args.ckpt, main_args.device)
 
     # model and optimizer
     model, optim, sched = initialize_model_and_optimizer(main_args, ckpt)
@@ -523,5 +514,6 @@ def main(main_args):
 
 
 if __name__ == "__main__":
-    dist_args = parse_args_dist()
+    # set all 28 args to defaults unless specified
+    dist_args = parse_args_dist()  # argparse: --username rocky -> args.username = "rocky"
     main(dist_args)

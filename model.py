@@ -27,9 +27,7 @@ class NonlinearActivation(nn.Module):
         elif act_type == "leaky_relu":
             self.nonlin = nn.LeakyReLU(inplace=True, negative_slope=0.01)
         else:
-            raise ValueError(
-                f"Invalid activation type: {act_type}. Please select from relu, leaky_relu."
-            )
+            raise ValueError(f"Invalid activation type: {act_type}. Please select from relu, leaky_relu.")
 
     def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -64,9 +62,7 @@ class Normalization(nn.Module):
         elif norm_type == "in":
             self.norm = nn.InstanceNorm3d(in_channels)
         else:
-            raise ValueError(
-                f"Invalid normalization type: {norm_type}. Please select from bn and in."
-            )
+            raise ValueError(f"Invalid normalization type: {norm_type}. Please select from bn and in.")
 
     def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
         """
@@ -93,51 +89,21 @@ class ResidualBlock(nn.Module):
           InstanceNorm). Default is 'in'.
     """
 
-    def __init__(
-        self, in_channels: int, out_channels: int, act: str, norm: Optional[str] = "in"
-    ):
+    def __init__(self, in_channels: int, out_channels: int, act: str, norm: Optional[str] = "in"):
         super().__init__()
 
-        self.conv1 = nn.Conv3d(
-            in_channels,
-            out_channels // 2,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            bias=False,
-        )
+        self.conv1 = nn.Conv3d(in_channels,out_channels // 2,kernel_size=1,stride=1,padding=0,bias=False,)
         self.norm1 = Normalization(norm_type=norm, in_channels=out_channels // 2)
         self.nonlin1 = NonlinearActivation(act_type=act)
 
-        self.conv2 = nn.Conv3d(
-            out_channels // 2,
-            out_channels // 2,
-            kernel_size=3,
-            stride=1,
-            padding=1,
-            bias=False,
-        )
+        self.conv2 = nn.Conv3d(out_channels // 2,out_channels // 2,kernel_size=3,stride=1,padding=1,bias=False,)
         self.norm2 = Normalization(norm_type=norm, in_channels=out_channels // 2)
         self.nonlin2 = NonlinearActivation(act_type=act)
 
-        self.conv3 = nn.Conv3d(
-            out_channels // 2,
-            out_channels // 2,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            bias=False,
-        )
+        self.conv3 = nn.Conv3d(out_channels // 2,out_channels // 2,kernel_size=1,stride=1,padding=0,bias=False,)
         self.norm3 = Normalization(norm_type=norm, in_channels=out_channels // 2)
 
-        self.conv_res = nn.Conv3d(
-            in_channels,
-            out_channels // 2,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            bias=False,
-        )
+        self.conv_res = nn.Conv3d(in_channels,out_channels // 2,kernel_size=1,stride=1,padding=0,bias=False,)
         self.nonlin_out = NonlinearActivation(act_type=act)
 
     def forward(self, input_tensor: torch.Tensor) -> torch.Tensor:
@@ -191,66 +157,45 @@ class Model(nn.Module):
 
     def __init__(
         self,
-        in_filters: int = 16,
-        filters: Tuple[int] = (16,),
-        out_filters: int = 128,
-        act: str = "relu",
-        norm: str = "in",
-        n_classes: int = 2,
-        n_clinical_data: int = -1,
+        # feature maps: edges / spots / lines etc.
+        in_filters: int = 16,  # expects 16 input feature maps. what are they?
+        filters: Tuple[int] = (16,),  # how many maps to output after each block
+        out_filters: int = 128,  # return 128 feature maps
+        act: str = "relu",  
+        norm: str = "in",  # instance normalization?
+        n_classes: int = 2,  # binary predictions: healthy or sick?
+        n_clinical_data: int = -1,  # 
     ) -> None:
-        super().__init__()
+        super().__init__()  # runs parent's __init__ constructor
         self.n_clinical_data = n_clinical_data
         layers = []
 
         # Initial convolutional layer
-        layers.append(
-            nn.Conv3d(1, in_filters, kernel_size=1, stride=1, padding=0, bias=False)
-        )
+        layers.append(nn.Conv3d(1, in_filters, kernel_size=1, stride=1, padding=0, bias=False))
         layers.append(Normalization(norm, in_filters))
         layers.append(NonlinearActivation(act))
 
         # Residual blocks
         for i, filt in enumerate(filters):
-            layers.append(
-                ResidualBlock(in_filters if i == 0 else filters[i - 1], filt, act=act)
-            )
-            layers.append(
-                nn.Conv3d(
-                    filt, filt, kernel_size=3, stride=2, padding=2, dilation=2, bias=False
-                )
-            )
+            layers.append(ResidualBlock(in_filters if i == 0 else filters[i - 1], filt, act=act))
+            layers.append(nn.Conv3d(filt, filt, kernel_size=3, stride=2, padding=2, dilation=2, bias=False))
             layers.append(Normalization(norm, filt))
             layers.append(NonlinearActivation(act))
-        self.layers = nn.Sequential(*layers)
+        self.layers = nn.Sequential(*layers)  # unpack/dereference: nn.Sequential(layer1, layer2, layer3, ...).
+        # nn.Sequential(layers) would be nn.Sequential([layer1, layer2, layer3])
 
-        self.out_conv = nn.Conv3d(
-            filters[-1], out_filters, kernel_size=1, stride=1, padding=0, bias=False
-        )
+        self.out_conv = nn.Conv3d(filters[-1], out_filters, kernel_size=1, stride=1, padding=0, bias=False)
         out_feats = 256 // (2 ** len(filters))
 
         # Conditional layers based on the presence of clinical data
         if n_clinical_data > 0:
-            self.fc_imaging = nn.Sequential(
-                nn.Linear(out_filters * out_feats**3, 32),
-                nn.BatchNorm1d(32),
-                NonlinearActivation(act),
-            )
-            self.fc_clinical = nn.Sequential(
-                nn.Linear(n_clinical_data, 32),
-                nn.BatchNorm1d(32),
-                NonlinearActivation(act),
-                nn.Linear(32, 32),
-                nn.BatchNorm1d(32),
-                NonlinearActivation(act),
-            )
+            self.fc_imaging = nn.Sequential(nn.Linear(out_filters * out_feats**3, 32),nn.BatchNorm1d(32),NonlinearActivation(act),)
+            self.fc_clinical = nn.Sequential(nn.Linear(n_clinical_data, 32),nn.BatchNorm1d(32),NonlinearActivation(act),nn.Linear(32, 32),nn.BatchNorm1d(32),NonlinearActivation(act),)
             self.fc_output = nn.Linear(32 + 32, n_classes)
         else:
             self.fc_mean = nn.Linear(out_filters * out_feats**3, n_classes)
 
-    def forward(
-        self, x_img: torch.Tensor, clinical_data: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def forward(self, x_img: torch.Tensor, clinical_data: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
         Forward pass for the model.
 
@@ -269,7 +214,7 @@ class Model(nn.Module):
         if self.n_clinical_data > 0:
             x_clinical = self.fc_clinical(clinical_data)
             x_img = self.fc_imaging(x_img)
-            x_data = torch.cat((x_img, x_clinical), dim=1)
+            x_data = torch.cat((x_img, x_clinical), dim=1)  # combine imaging and clinical data, seems too simple?
             x_data = self.fc_output(x_data)
             return x_data
 
